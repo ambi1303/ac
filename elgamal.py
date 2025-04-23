@@ -1,34 +1,65 @@
-def mod_exp(base, exp, mod):
-    return pow(base, exp, mod)
+# Simple ElGamal Cryptosystem in Python
 
-# Function to compute modular inverse using Fermat’s Theorem (a^(p-2) % p)
-def mod_inverse(a, p):
-    return pow(a, p - 2, p)  # Since p is prime, a^(-1) ≡ a^(p-2) mod p
+def egcd(a, b):
+    """Extended Euclidean Algorithm"""
+    if b == 0:
+        return a, 1, 0
+    g, x1, y1 = egcd(b, a % b)
+    return g, y1, x1 - (a // b) * y1
 
-def encrypt(P, p, e1, e2, r):
-    c1 = mod_exp(e1, r, p)  
-    c2 = (P * mod_exp(e2, r, p)) % p  
+
+def modinv(a, m):
+    """Modular inverse of a under modulus m"""
+    g, x, _ = egcd(a, m)
+    if g != 1:
+        raise ValueError("Modular inverse does not exist")
+    return x % m
+
+# Key generation
+# Choose a large prime p and a generator g of the multiplicative group modulo p.
+# Private key x: random in [1, p-2]
+# Public key y = g^x mod p
+
+def generate_keys(p, g, x):
+    y = pow(g, x, p)
+    return (p, g, y), x  # public, private
+
+# Encryption
+# Given public key (p, g, y) and message m < p, choose random k in [1, p-2]
+# c1 = g^k mod p, c2 = m * y^k mod p
+
+def encrypt(public, m, k):
+    p, g, y = public
+    c1 = pow(g, k, p)
+    c2 = (m * pow(y, k, p)) % p
     return c1, c2
 
-def decrypt(c1, c2, d, p):
-    c1_d_inv = mod_inverse(mod_exp(c1, d, p), p)  
-    P = (c2 * c1_d_inv) % p  
-    return P
+# Decryption
+# Given private key x and ciphertext (c1, c2)
+# m = c2 * (c1^x)^{-1} mod p
 
+def decrypt(private, public, ciphertext):
+    p, g, y = public
+    x = private
+    c1, c2 = ciphertext
+    s = pow(c1, x, p)
+    m = (c2 * modinv(s, p)) % p
+    return m
 
-p = int(input("Enter prime number p: "))
-e1 = int(input(f"Enter base e1 (primitive root of {p}): "))
-d = int(input("Enter private key d: "))
-r = int(input("Enter random number r: "))
+if __name__ == '__main__':
+    # Example usage with user input
+    p = int(input("Enter prime p: "))
+    g = int(input(f"Enter generator g (mod {p}): "))
+    x = int(input(f"Enter your private key x (1 <= x < {p-1}): "))
 
-e2 = mod_exp(e1, d, p)
-print(f"Public Key: (p={p}, e1={e1}, e2={e2})")
-print(f"Private Key: d={d}")
+    public, private = generate_keys(p, g, x)
+    print(f"Public key (p, g, y): {public}")
 
-P = int(input(f"Enter plaintext (less than {p}): "))
+    m = int(input(f"Enter plaintext m (0 <= m < {p}): "))
+    k = int(input(f"Enter random k for encryption (1 <= k < {p-1}): "))
 
-c1, c2 = encrypt(P, p, e1, e2, r)
-print(f"Ciphertext: (c1={c1}, c2={c2})")
+    ciphertext = encrypt(public, m, k)
+    print(f"Ciphertext (c1, c2): {ciphertext}")
 
-decrypted_P = decrypt(c1, c2, d, p)
-print(f"Decrypted Plaintext: {decrypted_P}")
+    decrypted = decrypt(private, public, ciphertext)
+    print(f"Decrypted message: {decrypted}")
