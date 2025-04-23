@@ -1,37 +1,53 @@
-import math
+# Shortened Rabin Cryptosystem without primality tests
 
-def mod_exp(base, exp, mod):
-    return pow(base, exp, mod)
-
-def extended_gcd(a, b):
+def egcd(a, b):
+    """Extended Euclidean Algorithm"""
     if b == 0:
         return a, 1, 0
-    gcd, x1, y1 = extended_gcd(b, a % b)
-    x, y = y1, x1 - (a // b) * y1
-    return gcd, x, y
+    g, x1, y1 = egcd(b, a % b)
+    return g, y1, x1 - (a // b) * y1
 
-def encrypt(plain_text, n):
-    return mod_exp(plain_text, 2, n)
 
-def decrypt(cipher_text, p, q):
+def modinv(a, m):
+    """Modular inverse of a under modulus m"""
+    g, x, _ = egcd(a, m)
+    if g != 1:
+        raise ValueError("No inverse")
+    return x % m
+
+
+def crt(r1, p, r2, q):
+    """Combine roots via CRT for modulus n=p*q"""
     n = p * q
-    m1 = mod_exp(cipher_text, (p + 1) // 4, p)
-    m2 = mod_exp(cipher_text, (q + 1) // 4, q)
-    _, x, y = extended_gcd(p, q)
-    P1 = (x * p * m2 + y * q * m1) % n
-    P2 = (x * p * m2 - y * q * m1) % n
-    P3 = n - P1
-    P4 = n - P2
-    return P1, P2, P3, P4
+    inv_p = modinv(p, q)
+    inv_q = modinv(q, p)
+    return (r1 * q * inv_q + r2 * p * inv_p) % n
 
-p = int(input("Enter prime p: "))
-q = int(input("Enter prime q: "))
-n = p * q
 
-P = int(input(f"Enter plaintext (less than {n}): "))
+def encrypt(m, n):
+    return pow(m, 2, n)
 
-C = encrypt(P, n)
-print(f"Ciphertext: {C}")
 
-possible_plaintexts = decrypt(C, p, q)
-print(f"Possible Plaintexts: {possible_plaintexts}")
+def decrypt(c, p, q):
+    n = p * q
+    # Compute square roots modulo p and q (p,q ≡ 3 mod 4 assumed)
+    r_p = pow(c, (p + 1) // 4, p)
+    r_q = pow(c, (q + 1) // 4, q)
+    roots = []
+    for sp in (r_p, (-r_p) % p):
+        for sq in (r_q, (-r_q) % q):
+            roots.append(crt(sp, p, sq, q))
+    return sorted(set(roots))
+
+if __name__ == '__main__':
+    # Input primes and message
+    p = int(input("Enter prime p (≡3 mod4): "))
+    q = int(input("Enter prime q (≡3 mod4): "))
+    n = p * q
+    m = int(input(f"Enter plaintext m (0 ≤ m < {n}): "))
+
+    # Encrypt and decrypt
+    c = encrypt(m, n)
+    print(f"Ciphertext: {c}")
+    options = decrypt(c, p, q)
+    print(f"Possible plaintexts: {options}")
